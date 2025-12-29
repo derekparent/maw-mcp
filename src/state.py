@@ -36,7 +36,7 @@ class WorkflowState(BaseModel):
     """Complete workflow state for a project"""
     project: str
     project_path: str
-    phase: int = 0
+    phase: str = "idle"  # idle, review, launch, integrate, decide
     iteration: int = 0
     status: str = "not_started"
     tech_stack: Optional[str] = None
@@ -127,23 +127,31 @@ def format_status(state: WorkflowState) -> str:
 
 def suggest_next_step(state: WorkflowState) -> str:
     """Suggest next action based on current state"""
-    if state.status == "not_started":
+    phase = state.phase
+    
+    if phase == "idle" or state.status == "not_started":
         return "→ Run maw_review to analyze codebase and generate agent prompts"
     
-    if state.phase == 3 and state.review_complete:
-        return "→ Run maw_launch to get agent prompts and start Phase 4"
+    if phase == "review" and state.review_complete:
+        return "→ Run maw_launch to get agent prompts and launch sequence"
     
-    if state.phase == 4:
+    if phase == "review":
+        return "→ Review AGENT_PROMPTS/, then run maw_launch"
+    
+    if phase == "launch":
         agents = state.agents
         incomplete = [a for a in agents if a.status != "complete"]
         if incomplete:
             return f"→ {len(incomplete)} agents still working. Run maw_checkin with progress reports."
         return "→ All agents complete! Run maw_integrate for merge guidance"
     
-    if state.phase == 5:
-        return "→ Run maw_decide to determine: deploy, iterate, or add features"
+    if phase == "integrate":
+        return "→ Complete test plan, then run maw_decide"
+    
+    if phase == "decide":
+        return "→ Deploy, iterate (run maw_review), or add features"
     
     if "complete" in state.status:
         return "→ Workflow complete. Run maw_review for next iteration."
     
-    return f"→ Continue Phase {state.phase} (status: {state.status})"
+    return f"→ Continue {phase} phase (status: {state.status})"

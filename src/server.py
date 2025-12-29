@@ -50,7 +50,7 @@ async def list_tools():
         ),
         Tool(
             name="maw_review",
-            description="Phase 3: Analyze codebase, identify improvements, generate agent prompts. PAUSES for your review before agents can be launched.",
+            description="Analyze codebase, identify improvements, generate agent prompts. PAUSES for your review before agents can be launched.",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -68,7 +68,7 @@ async def list_tools():
         ),
         Tool(
             name="maw_launch",
-            description="Phase 4: Get agent prompts with branch names and launch sequence",
+            description="Get agent prompts with branch names and launch sequence",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -82,7 +82,7 @@ async def list_tools():
         ),
         Tool(
             name="maw_checkin",
-            description="Phase 4: Evaluate agent progress reports and get updated guidance",
+            description="Evaluate agent progress reports, get aggregated status dashboard",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -97,7 +97,7 @@ async def list_tools():
         ),
         Tool(
             name="maw_integrate",
-            description="Phase 5: Get merge order, conflict detection, and integration checklist",
+            description="Get merge order, test plan, and integration checklist",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -107,7 +107,7 @@ async def list_tools():
         ),
         Tool(
             name="maw_decide",
-            description="Phase 6: Get recommendation to deploy, iterate, or add features",
+            description="Get recommendation to deploy, iterate, or add features",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -188,7 +188,7 @@ async def handle_status(args: dict) -> str:
 
 
 async def handle_review(args: dict) -> str:
-    """Phase 3: Analyze and generate agent prompts"""
+    """Review: Analyze and generate agent prompts"""
     project_path = args.get("project_path", ".")
     focus = args.get("focus", "all")
     wave_name = args.get("wave_name", "")
@@ -204,7 +204,7 @@ async def handle_review(args: dict) -> str:
     # For now, return instructions for the LLM to do the analysis
     
     analysis_prompt = f"""
-## Phase 3: Codex Review
+## Review: Codebase Analysis
 
 Analyze this codebase and identify 3-5 high-impact improvements.
 
@@ -279,7 +279,7 @@ Then tell the user: "Review AGENT_PROMPTS/ before running maw_launch"
 """
     
     # Update state
-    state.phase = 3
+    state.phase = "review"
     state.status = "reviewing"
     if wave_name:
         state.wave = WaveInfo(number=state.iteration + 1, name=wave_name)
@@ -289,7 +289,7 @@ Then tell the user: "Review AGENT_PROMPTS/ before running maw_launch"
 
 
 async def handle_launch(args: dict) -> str:
-    """Phase 4: Get agent launch prompts with sequencing"""
+    """Launch: Get agent prompts with sequencing"""
     project_path = args.get("project_path", ".")
     agent_id = args.get("agent_id")
     
@@ -359,7 +359,7 @@ Then you can run maw_launch."""
         lines.append("")
     
     # Update state
-    state.phase = 4
+    state.phase = "launch"
     state.status = "launching"
     save_state(state, project_path)
     
@@ -367,7 +367,7 @@ Then you can run maw_launch."""
 
 
 async def handle_checkin(args: dict) -> str:
-    """Phase 4: Evaluate progress and provide guidance"""
+    """Checkin: Evaluate progress and provide guidance"""
     project_path = args.get("project_path", ".")
     reports = args.get("reports", "")
     
@@ -567,12 +567,12 @@ Then run maw_checkin again with the reports."""
 
 
 async def handle_integrate(args: dict) -> str:
-    """Phase 5: Integration guidance with test plan"""
+    """Integrate: Merge guidance with test plan"""
     project_path = args.get("project_path", ".")
     state = load_state(project_path)
     path = Path(project_path).resolve()
     
-    lines = ["## Phase 5: Integration\n"]
+    lines = ["## Integrate\n"]
     
     # Try to read agent completion info from AGENT_PROMPTS or state
     prompts_dir = path / "AGENT_PROMPTS"
@@ -796,7 +796,7 @@ async def handle_integrate(args: dict) -> str:
     lines.append("Run `maw_decide` to determine: deploy, iterate, or add features.")
     
     # Update state
-    state.phase = 5
+    state.phase = "integrate"
     state.status = "integrating"
     save_state(state, project_path)
     
@@ -804,11 +804,11 @@ async def handle_integrate(args: dict) -> str:
 
 
 async def handle_decide(args: dict) -> str:
-    """Phase 6: Deploy/iterate/add decision"""
+    """Decide: Deploy/iterate/add decision"""
     project_path = args.get("project_path", ".")
     state = load_state(project_path)
     
-    return f"""## Phase 6: Decision Time
+    return f"""## Decide: What's Next?
 
 ### Current State
 - Project: {state.project}

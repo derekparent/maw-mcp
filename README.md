@@ -4,10 +4,10 @@ Coordinate parallel AI agent development workflows from any Claude interface.
 
 ## What It Does
 
-- **Phase 3 (Review)**: Analyze codebase, identify improvements, generate agent prompts
-- **Phase 4 (Launch)**: Get copy-paste prompts with branch names and sequencing
-- **Phase 5 (Integrate)**: Merge order guidance and conflict detection
-- **Phase 6 (Decide)**: Deploy, iterate, or add features recommendation
+- **Review**: Analyze codebase, identify improvements, generate agent prompts
+- **Launch**: Get copy-paste prompts with branch names and sequencing
+- **Integrate**: Merge order + comprehensive test plan
+- **Decide**: Deploy, iterate, or add features recommendation
 
 ## Installation
 
@@ -62,28 +62,24 @@ Add to `.cursor/mcp.json` in your project:
 | Tool | Description |
 |------|-------------|
 | `maw_status` | Show current workflow state and next action |
-| `maw_review` | Phase 3: Analyze codebase, generate agent prompts |
-| `maw_launch` | Phase 4: Get agent prompts with sequencing |
-| `maw_checkin` | Phase 4: Evaluate progress, get updated guidance |
-| `maw_integrate` | Phase 5: Merge order and conflict detection |
-| `maw_decide` | Phase 6: Deploy/iterate/add recommendation |
+| `maw_review` | Analyze codebase, generate agent prompts |
+| `maw_launch` | Get agent prompts with sequencing |
+| `maw_checkin` | Aggregate progress reports, show dashboard |
+| `maw_integrate` | Merge order + test plan |
+| `maw_decide` | Deploy/iterate/add recommendation |
 | `maw_learn` | Capture learnings to PROJECT_LEARNINGS.md |
 | `maw_patterns` | Search accumulated patterns |
 
-## Usage
-
-### Starting a Workflow
+## Workflow
 
 ```
-> maw_status
-📊 my-project
-Phase: 0 | Iteration: 0
-Status: not_started
-
-→ Run maw_review to analyze codebase and generate agent prompts
+idle → review → launch → integrate → decide
+          ↑                             ↓
+          └─────────────────────────────┘
+                    (iterate)
 ```
 
-### Review Phase
+### Review
 
 ```
 > maw_review focus="security" wave_name="Security Hardening"
@@ -93,7 +89,7 @@ Status: not_started
 Review AGENT_PROMPTS/ before running maw_launch
 ```
 
-### Launch Agents
+### Launch
 
 ```
 > maw_launch
@@ -108,23 +104,22 @@ Review AGENT_PROMPTS/ before running maw_launch
 
 #### Agent 1: Backend Security
 **Branch:** `agent/1-backend-security`
-
-```
-You are Agent 1: Backend Security
-Branch: agent/1-backend-security
-Read and implement: AGENT_PROMPTS/1_Backend_Security.md
-Create PR when done.
-START NOW
-```
+...
 ```
 
-### Check Progress
+### Check In
+
+Agents provide completion reports when done:
 
 ```
-> maw_checkin reports="Agent 1: ✅ Done: Auth implementation..."
+> maw_checkin reports="## Agent 1 Completion Report..."
 
-## Progress Analysis
-[Re-evaluation and updated prompts if needed]
+## 📊 Agent Status Dashboard
+
+| Status | Count |
+|--------|-------|
+| ✅ Complete | 3 |
+| ⚠️ Partial | 1 |
 ```
 
 ### Integrate
@@ -132,20 +127,29 @@ START NOW
 ```
 > maw_integrate
 
-## Phase 5: Integration
+## Integrate
 
 ### Recommended Merge Order
-1. Documentation/Tests
-2. Backend/Infrastructure
-3. Frontend/UI
+1. Documentation (lowest risk)
+2. Tests
+3. Backend
+4. Frontend
+
+## 🧪 Pre-Integration Test Plan
+
+| Test | Expected | Status |
+|------|----------|--------|
+| App starts | Clean startup | ☐ |
+| GET /api/health | 200 OK | ☐ |
+...
 ```
 
-### Decide Next Steps
+### Decide
 
 ```
 > maw_decide
 
-## Phase 6: Decision Time
+## Decide: What's Next?
 
 | Condition | Recommendation |
 |-----------|----------------|
@@ -171,27 +175,25 @@ your-project/
 - **Soft enforcement**: Warnings, not hard blocks
 - **You're the operator**: Tools inform, you decide
 - **Deliberate pacing**: Review before launch, check before integrate
-- **Minimal project footprint**: Phase guides stay in server, not copied everywhere
+- **Minimal project footprint**: Guides stay in server, not copied everywhere
 
 ## Content
 
-Phase guides and templates live in `content/`:
+Guides and templates in `content/`:
 
 ```
 content/
 ├── phases/
-│   ├── phase1-planning.md
-│   ├── phase3-codex-review.md
-│   ├── phase4-agent-launcher.md
-│   ├── phase5-integration.md
-│   └── phase6-iteration.md
+│   ├── review.md
+│   ├── launch.md
+│   ├── integrate.md
+│   └── decide.md
 ├── templates/
 │   ├── AGENT_PROMPT.md
+│   ├── COORDINATION.md
 │   └── PR_TEMPLATE.md
 └── UNIVERSAL_PATTERNS.md
 ```
-
-These are accessible via MCP resources or `maw_patterns`.
 
 ## License
 
