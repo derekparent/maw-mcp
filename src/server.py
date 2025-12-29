@@ -17,6 +17,10 @@ from .state import (
     WorkflowState, AgentInfo, WaveInfo,
     load_state, save_state, format_status, suggest_next_step
 )
+from .github import (
+    get_agent_prs, detect_conflicts, format_pr_dashboard,
+    get_local_branches, run_gh
+)
 
 # Server setup
 server = Server("maw-mcp")
@@ -82,17 +86,21 @@ async def list_tools():
         ),
         Tool(
             name="maw_checkin",
-            description="Evaluate agent progress reports, get aggregated status dashboard",
+            description="Check agent progress. Auto-fetches from GitHub PRs, or paste reports manually.",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "project_path": {"type": "string", "default": "."},
                     "reports": {
                         "type": "string",
-                        "description": "Paste agent progress reports here"
+                        "description": "Optional: paste reports manually (auto-fetches from GitHub if omitted)"
+                    },
+                    "auto": {
+                        "type": "boolean",
+                        "description": "Auto-fetch from GitHub PRs (default: true)",
+                        "default": True
                     }
-                },
-                "required": ["reports"]
+                }
             }
         ),
         Tool(
@@ -370,45 +378,68 @@ async def handle_checkin(args: dict) -> str:
     """Checkin: Evaluate progress and provide guidance"""
     project_path = args.get("project_path", ".")
     reports = args.get("reports", "")
+    auto_fetch = args.get("auto", True)  # Auto-fetch from GitHub by default
     
+    # If no reports provided, try to fetch from GitHub
+    if not reports and auto_fetch:
+        success, prs = get_agent_prs(project_path)
+        
+        if success and prs:
+            conflicts = detect_conflicts(prs)
+            return format_pr_dashboard(prs, conflicts)
+        elif success and not prs:
+            # No agent PRs found - check for local branches
+            local_branches = get_local_branches(project_path)
+            agent_branches = [b for b in local_branches if b.startswith("agent/")]
+            
+            if agent_branches:
+                lines = ["## 📊 Agent Status\n"]
+                lines.append("### Local Branches (no PRs yet)")
+                lines.append("These agent branches exist but don't have PRs:\n")
+                for branch in agent_branches:
+                    lines.append(f"- `{branch}`")
+                lines.append("\nAgents should create PRs when done.")
+                lines.append("\nOr paste completion reports manually below.")
+                return "\n".join(lines)
+            else:
+                return """## Agent Check-in
+
+No agent PRs or branches found.
+
+**Options:**
+1. Wait for agents to create PRs (they'll appear automatically)
+2. Paste completion reports manually:
+
+```
+Agent 1 Done.
+✓ [What they did]
+PR: #N or URL
+
+Agent 2 Done.
+...
+```"""
+        else:
+            # GitHub fetch failed - fall back to manual
+            return f"""## Agent Check-in
+
+⚠️ Couldn't fetch from GitHub: {prs}
+
+**Fallback:** Paste completion reports manually:
+
+```
+Agent 1 Done.
+✓ [What they did]  
+PR: #N or URL
+
+Agent 2 Done.
+...
+```"""
+    
+    # Manual reports provided - parse them
     if not reports:
         return """## Agent Check-in
 
-Paste completion reports from each agent. Expected format:
-
-```
-## Agent 1 Completion Report
-
-**Status:** ✅ Complete
-**Branch:** `agent/1-backend-security`
-**PR:** #45
-
-### What Was Done
-- Implemented JWT authentication
-- Added rate limiting
-
-### Files Changed
-| File | Change |
-|------|--------|
-| src/auth.py | Created (120 lines) |
-
-### Tests
-- Added: 12 new tests
-- Status: All passing
-
-### API/Endpoints Affected
-- POST /api/login - new
-- GET /api/profile - new
-
-### Notes for Integration
-- Requires SECRET_KEY env var
-- Merge after Agent 2
-
-## Agent 2 Completion Report
-...
-```
-
-Then run maw_checkin again with the reports."""
+Paste completion reports from each agent, or just run `maw_checkin` to auto-fetch from GitHub PRs."""
 
     # Parse completion reports
     lines = ["## 📊 Agent Status Dashboard\n"]
@@ -574,7 +605,11 @@ async def handle_integrate(args: dict) -> str:
     
     lines = ["## Integrate\n"]
     
-    # Try to read agent completion info from AGENT_PROMPTS or state
+    # Try to fetch PRs from GitHub first
+    gh_success, prs = get_agent_prs(project_path)
+    gh_conflicts = detect_conflicts(prs) if gh_success and prs else []
+    
+    # Collect file info from GitHub PRs or AGENT_PROMPTS
     prompts_dir = path / "AGENT_PROMPTS"
     agents_info = []
     all_files = set()
@@ -582,14 +617,31 @@ async def handle_integrate(args: dict) -> str:
     has_db_changes = False
     has_env_changes = False
     
-    # Parse agent prompts to understand what was changed
-    if prompts_dir.exists():
+    # If we have GitHub PRs, use that data
+    if gh_success and prs:
+        for pr in prs:
+            agent_num = pr.get("agent_num", 0)
+            branch = pr.get("headRefName", "")
+            role = branch.replace(f"agent/{agent_num}-", "").replace("-", " ").title()
+            agents_info.append((agent_num, role, pr.get("number")))
+            
+            for f in pr.get("files", []):
+                file_path = f.get("path", str(f)) if isinstance(f, dict) else str(f)
+                all_files.add(file_path)
+                
+                # Check for DB/env indicators
+                if any(x in file_path.lower() for x in ['migration', 'model', 'database', 'db']):
+                    has_db_changes = True
+                if any(x in file_path.lower() for x in ['config', 'env', '.env']):
+                    has_env_changes = True
+    
+    # Fall back to AGENT_PROMPTS if no GitHub data
+    elif prompts_dir.exists():
         for pf in sorted(prompts_dir.glob("[0-9]_*.md")):
             agent_num = int(pf.name.split("_")[0])
             role = pf.stem.split("_", 1)[1].replace("_", " ")
             content = pf.read_text()
             
-            # Extract files to modify
             files_section = re.search(r'## Files to Modify\s*\n((?:- [^\n]+\n)*)', content)
             if files_section:
                 for line in files_section.group(1).strip().split('\n'):
@@ -598,12 +650,11 @@ async def handle_integrate(args: dict) -> str:
                         if file_path:
                             all_files.add(file_path.group(1))
             
-            agents_info.append((agent_num, role))
+            agents_info.append((agent_num, role, None))  # No PR number
             
-            # Check for DB/env changes in content
-            if 'migration' in content.lower() or 'database' in content.lower() or 'model' in content.lower():
+            if 'migration' in content.lower() or 'database' in content.lower():
                 has_db_changes = True
-            if 'env' in content.lower() or 'environment' in content.lower() or 'config' in content.lower():
+            if 'env' in content.lower() or 'config' in content.lower():
                 has_env_changes = True
     
     # Detect endpoint files
@@ -613,9 +664,12 @@ async def handle_integrate(args: dict) -> str:
     
     # Pre-merge checklist
     lines.append("### Pre-Merge Checklist")
-    lines.append("- [ ] All agents report complete (run `maw_checkin` with reports)")
+    lines.append("- [ ] All agents report complete (run `maw_checkin`)")
     lines.append("- [ ] All PRs created and passing CI")
-    lines.append("- [ ] No merge conflicts detected")
+    if gh_conflicts:
+        lines.append(f"- [ ] ⚠️ **{len(gh_conflicts)} file conflicts** - merge carefully (see below)")
+    else:
+        lines.append("- [ ] No merge conflicts detected")
     if has_db_changes:
         lines.append("- [ ] Database backup created")
         lines.append("- [ ] Migration tested on staging")
@@ -623,6 +677,19 @@ async def handle_integrate(args: dict) -> str:
         lines.append("- [ ] New environment variables documented")
         lines.append("- [ ] .env.example updated")
     lines.append("")
+    
+    # Conflict warnings
+    if gh_conflicts:
+        lines.append("### ⚠️ File Conflicts Detected")
+        lines.append("These files are modified by multiple PRs:\n")
+        lines.append("| File | PRs |")
+        lines.append("|------|-----|")
+        for c in gh_conflicts:
+            pr_list = ", ".join(f"#{n}" for n in c["prs"])
+            lines.append(f"| `{c['file']}` | {pr_list} |")
+        lines.append("")
+        lines.append("**Merge one at a time, rebasing after each.**")
+        lines.append("")
     
     # Merge order
     lines.append("### Recommended Merge Order\n")
@@ -634,61 +701,91 @@ async def handle_integrate(args: dict) -> str:
     frontend_agents = []
     other_agents = []
     
-    for agent_num, role in agents_info:
+    for item in agents_info:
+        agent_num = item[0]
+        role = item[1]
+        pr_num = item[2] if len(item) > 2 else None
         role_lower = role.lower()
-        if 'doc' in role_lower or 'writer' in role_lower:
-            docs_agents.append((agent_num, role))
-        elif 'test' in role_lower or 'qa' in role_lower:
-            test_agents.append((agent_num, role))
-        elif 'backend' in role_lower or 'api' in role_lower or 'security' in role_lower or 'database' in role_lower:
-            backend_agents.append((agent_num, role))
-        elif 'frontend' in role_lower or 'ui' in role_lower or 'interface' in role_lower:
-            frontend_agents.append((agent_num, role))
+        
+        agent_entry = (agent_num, role, pr_num)
+        if 'doc' in role_lower or 'writer' in role_lower or 'deploy' in role_lower:
+            docs_agents.append(agent_entry)
+        elif 'test' in role_lower or 'qa' in role_lower or 'integration' in role_lower:
+            test_agents.append(agent_entry)
+        elif 'backend' in role_lower or 'api' in role_lower or 'security' in role_lower or 'database' in role_lower or 'logging' in role_lower:
+            backend_agents.append(agent_entry)
+        elif 'frontend' in role_lower or 'ui' in role_lower or 'interface' in role_lower or 'offline' in role_lower:
+            frontend_agents.append(agent_entry)
         else:
-            other_agents.append((agent_num, role))
+            other_agents.append(agent_entry)
     
     merge_order = 1
+    merge_sequence = []  # Track order for commands
+    
     if docs_agents:
         lines.append(f"**{merge_order}. Documentation** (lowest risk)")
-        for agent_num, role in docs_agents:
-            lines.append(f"   - Agent {agent_num}: {role}")
+        for agent_num, role, pr_num in docs_agents:
+            pr_text = f" → PR #{pr_num}" if pr_num else ""
+            lines.append(f"   - Agent {agent_num}: {role}{pr_text}")
+            if pr_num:
+                merge_sequence.append(pr_num)
         merge_order += 1
     
     if test_agents:
         lines.append(f"**{merge_order}. Tests** (low risk, improves safety)")
-        for agent_num, role in test_agents:
-            lines.append(f"   - Agent {agent_num}: {role}")
+        for agent_num, role, pr_num in test_agents:
+            pr_text = f" → PR #{pr_num}" if pr_num else ""
+            lines.append(f"   - Agent {agent_num}: {role}{pr_text}")
+            if pr_num:
+                merge_sequence.append(pr_num)
         merge_order += 1
     
     if backend_agents:
         lines.append(f"**{merge_order}. Backend/Infrastructure**")
-        for agent_num, role in backend_agents:
-            lines.append(f"   - Agent {agent_num}: {role}")
+        for agent_num, role, pr_num in backend_agents:
+            pr_text = f" → PR #{pr_num}" if pr_num else ""
+            lines.append(f"   - Agent {agent_num}: {role}{pr_text}")
+            if pr_num:
+                merge_sequence.append(pr_num)
         merge_order += 1
     
     if frontend_agents:
         lines.append(f"**{merge_order}. Frontend/UI** (after backend stable)")
-        for agent_num, role in frontend_agents:
-            lines.append(f"   - Agent {agent_num}: {role}")
+        for agent_num, role, pr_num in frontend_agents:
+            pr_text = f" → PR #{pr_num}" if pr_num else ""
+            lines.append(f"   - Agent {agent_num}: {role}{pr_text}")
+            if pr_num:
+                merge_sequence.append(pr_num)
         merge_order += 1
     
     if other_agents:
         lines.append(f"**{merge_order}. Other**")
-        for agent_num, role in other_agents:
-            lines.append(f"   - Agent {agent_num}: {role}")
+        for agent_num, role, pr_num in other_agents:
+            pr_text = f" → PR #{pr_num}" if pr_num else ""
+            lines.append(f"   - Agent {agent_num}: {role}{pr_text}")
+            if pr_num:
+                merge_sequence.append(pr_num)
     
     lines.append("")
     
-    # Merge commands
+    # Merge commands with actual PR numbers
     lines.append("### Merge Commands\n")
-    lines.append("```bash")
-    lines.append("# For each PR in order:")
-    lines.append("gh pr view <number>           # Review changes")
-    lines.append("gh pr checks <number>         # Verify CI passes")
-    lines.append("gh pr merge <number> --squash # Merge")
-    lines.append("git pull                      # Update local")
-    lines.append("pytest                        # Run tests")
-    lines.append("```")
+    
+    if merge_sequence:
+        lines.append("```bash")
+        lines.append("# Merge in this order:")
+        for pr_num in merge_sequence:
+            lines.append(f"gh pr merge {pr_num} --squash && git pull && pytest")
+        lines.append("```")
+    else:
+        lines.append("```bash")
+        lines.append("# For each PR in order:")
+        lines.append("gh pr view <number>           # Review changes")
+        lines.append("gh pr checks <number>         # Verify CI passes")
+        lines.append("gh pr merge <number> --squash # Merge")
+        lines.append("git pull                      # Update local")
+        lines.append("pytest                        # Run tests")
+        lines.append("```")
     lines.append("")
     
     # =========================================================================

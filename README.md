@@ -13,14 +13,15 @@ Coordinate parallel AI agent development workflows from any Claude interface.
 
 ```bash
 # Clone
-git clone https://github.com/your-username/maw-mcp
+git clone https://github.com/Dparent97/maw-mcp
 cd maw-mcp
+
+# Create virtual environment
+python3 -m venv venv
+source venv/bin/activate
 
 # Install
 pip install -e .
-
-# Or with uv
-uv pip install -e .
 ```
 
 ## Configuration
@@ -43,13 +44,13 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 ### Cursor
 
-Add to `.cursor/mcp.json` in your project:
+Add to `~/.cursor/mcp.json`:
 
 ```json
 {
   "mcpServers": {
     "maw": {
-      "command": "python",
+      "command": "/Users/dp/Projects/maw-mcp/venv/bin/python",
       "args": ["-m", "src.server"],
       "cwd": "/Users/dp/Projects/maw-mcp"
     }
