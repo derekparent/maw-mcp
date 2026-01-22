@@ -44,6 +44,56 @@ Read this file, create branch `agent/[N]-[slug]`, implement, create PR.
 
 ---
 
+## DISCIPLINE RULES
+
+### Test-Driven Development
+
+RED → GREEN → REFACTOR. No exceptions.
+
+| Excuse | Reality |
+|--------|---------|
+| "Too simple to test" | Simple code breaks. Test takes 30 seconds. |
+| "I'll test after" | Tests added after prove nothing. They pass by definition. |
+| "Already manually tested" | No record, can't re-run, doesn't count. |
+| "Code already written" | Delete it. Start over with the test. |
+| "Hard to test" | Hard to test = bad design. Listen to the friction. |
+| "Just a prototype" | First code sets the pattern. Do it right now. |
+
+**Wrote code before the test? Delete it. Start with the test.**
+
+### Debugging: The 3-Attempt Rule
+
+If you've tried 3+ fixes without success: **STOP.**
+
+You're treating symptoms, not root cause. Go back to basics:
+
+1. **Reproduce** - Can you trigger it reliably? Minimal repro case.
+2. **Isolate** - Binary search. Add logging. Which component?
+3. **Trace backward** - Start at symptom, walk back to root cause.
+4. **Fix the root** - Write a failing test for the ROOT cause, then fix.
+
+Red flags that mean you're guessing:
+- "Let me try one more thing"
+- Fix works but you're not sure why
+- Fix causes a different failure
+
+### Verification Before Completion
+
+**Claims without fresh evidence = lies.**
+
+Before claiming ANY task complete:
+1. **Identify** - What command proves this claim?
+2. **Run** - Execute the command FRESH (in this session)
+3. **Read** - Full output, check exit code, count pass/fail
+4. **Include** - Put the evidence in your completion report
+
+❌ "Tests pass, task complete"  
+✅ "Ran `pytest tests/ -v`, 12/12 passed, output below. Task complete."
+
+Your completion report will be verified. Don't waste everyone's time.
+
+---
+
 ## COMPLETION REPORT FORMAT
 
 When you finish, provide this report for the coordinator:
