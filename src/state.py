@@ -41,6 +41,8 @@ class WorkflowState(BaseModel):
     status: str = "not_started"
     tech_stack: Optional[str] = None
     review_complete: bool = False
+    mode: str = "parallel"  # "parallel" | "sequential"
+    current_task_index: int = 0  # For sequential mode: which task is next
     wave: Optional[WaveInfo] = None
     agents: list[AgentInfo] = []
     history: list[dict[str, Any]] = []
@@ -100,6 +102,10 @@ def format_status(state: WorkflowState) -> str:
     
     if state.review_complete:
         lines.append("✅ Review complete - ready for launch")
+    
+    # Show sequential mode status
+    if state.mode == "sequential":
+        lines.append(f"🔢 Sequential mode: task {state.current_task_index + 1} next")
     
     # Agent status
     if state.agents:

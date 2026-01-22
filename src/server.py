@@ -369,7 +369,7 @@ async def list_tools():
         ),
         Tool(
             name="maw_launch",
-            description="Get agent prompts with branch names and launch sequence",
+            description="Get agent prompts with branch names and launch sequence. Use next=true for sequential single-agent mode.",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -377,6 +377,11 @@ async def list_tools():
                     "agent_id": {
                         "type": "integer",
                         "description": "Get prompt for specific agent only"
+                    },
+                    "next": {
+                        "type": "boolean",
+                        "description": "Sequential mode: get only the next unstarted task (default: false, returns all)",
+                        "default": False
                     }
                 }
             }
@@ -685,6 +690,7 @@ async def handle_launch(args: dict) -> str:
         return setup_msg
     
     agent_id = args.get("agent_id")
+    next_only = args.get("next", False)
     
     state = load_state(project_path)
     path = Path(project_path).resolve()
@@ -707,6 +713,66 @@ Then you can run maw_launch."""
     prompt_files = sorted(prompts_dir.glob("[0-9]_*.md"))
     if not prompt_files:
         return "⚠️ No agent prompt files found (expected: 1_Role.md, 2_Role.md, etc.)"
+    
+    # =========================================================================
+    # SEQUENTIAL MODE: Return one task at a time
+    # =========================================================================
+    if next_only:
+        state.mode = "sequential"
+        total_tasks = len(prompt_files)
+        
+        # Check if all tasks are done
+        if state.current_task_index >= total_tasks:
+            return f"""## ✅ All {total_tasks} Tasks Complete
+
+You've worked through all agent tasks sequentially.
+
+**Next steps:**
+- Run `maw_clean` to reset for a new iteration
+- Run `maw_review` to identify more improvements
+- Or you're done! 🎉"""
+        
+        # Get current task
+        current_file = prompt_files[state.current_task_index]
+        agent_num = int(current_file.name.split("_")[0])
+        content = current_file.read_text()
+        role = current_file.stem.split("_", 1)[1].replace("_", " ")
+        
+        # Extract branch from content or generate
+        branch_match = re.search(r'`(agent/\d+-[^`]+)`', content)
+        branch = branch_match.group(1) if branch_match else f"agent/{agent_num}-{slugify(role)}"
+        
+        lines = [
+            f"## 🔢 Task {state.current_task_index + 1} of {total_tasks}",
+            "",
+            f"### Agent {agent_num}: {role}",
+            f"**Branch:** `{branch}`",
+            "",
+            "```",
+            f"You are Agent {agent_num}: {role}",
+            f"Branch: {branch}",
+            f"Read and implement: AGENT_PROMPTS/{current_file.name}",
+            "Create PR when done.",
+            "START NOW",
+            "```",
+            "",
+            "---",
+            "",
+            f"*Run `maw_launch next=true` again for the next task ({total_tasks - state.current_task_index - 1} remaining)*",
+        ]
+        
+        # Increment for next time
+        state.current_task_index += 1
+        state.phase = "launch"
+        state.status = "launching"
+        save_state(state, project_path)
+        
+        return "\n".join(lines)
+    
+    # =========================================================================
+    # PARALLEL MODE: Return all tasks (existing behavior)
+    # =========================================================================
+    state.mode = "parallel"
     
     # Build launch output
     lines = ["## 🚀 Agent Launch Sequence\n"]
