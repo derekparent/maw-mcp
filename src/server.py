@@ -210,6 +210,7 @@ This repo uses MAW (Multi-Agent Workflow) to coordinate parallel AI development.
 | `maw_status` | Where am I? What's next? |
 | `maw_review` | Analyze code, create agent tasks |
 | `maw_launch` | Get copy-paste prompts for agents |
+| `maw_launch next=true` | Sequential mode: one task at a time |
 | `maw_checkin` | Check agent progress (auto-fetches PRs) |
 | `maw_integrate` | Get merge order + test checklist |
 | `maw_decide` | Deploy, iterate, or move on? |
@@ -266,11 +267,19 @@ maw_review focus="error messages are unhelpful"
 3. **One iteration at a time** - Complete the cycle before starting another
 4. **Capture learnings** - Use `maw_learn` when you hit something tricky
 
+## When to Use Sequential Mode
+
+Can't run multiple agents? Use `maw_launch next=true`:
+- Returns one task at a time
+- Call again to get the next task
+- State persists across sessions
+
+Good for small projects or limited compute.
+
 ## When NOT to Use MAW
 
 - Single-file changes
 - Quick fixes (< 30 min)
-- When you can't run multiple agents in parallel
 
 Just do those directly.
 

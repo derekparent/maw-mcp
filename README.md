@@ -64,7 +64,7 @@ Add to `~/.cursor/mcp.json`:
 |------|-------------|
 | `maw_status` | Show current workflow state and next action |
 | `maw_review` | Analyze codebase, generate agent prompts |
-| `maw_launch` | Get agent prompts with sequencing |
+| `maw_launch` | Get agent prompts with sequencing. Use `next=true` for one-at-a-time mode |
 | `maw_checkin` | Aggregate progress reports, show dashboard |
 | `maw_integrate` | Merge order + test plan |
 | `maw_decide` | Deploy/iterate/add recommendation |
@@ -153,6 +153,24 @@ MAW reads this and prioritizes findings accordingly. The `--focus` flag override
 **Branch:** `agent/1-backend-security`
 ...
 ```
+
+#### Sequential Mode
+
+For smaller projects or when you can't run multiple agents, use sequential mode:
+
+```
+> maw_launch next=true
+
+## 🔢 Task 1 of 4
+
+### Agent 1: Backend Security
+**Branch:** `agent/1-backend-security`
+...
+
+*Run `maw_launch next=true` again for the next task (3 remaining)*
+```
+
+Call `maw_launch next=true` repeatedly to work through tasks one at a time. State persists across sessions.
 
 ### Check In
 
