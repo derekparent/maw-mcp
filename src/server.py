@@ -24,6 +24,130 @@ from .github import (
 
 # Server setup
 server = Server("maw-mcp")
+
+# =============================================================================
+# FOCUS RESOLUTION - Natural Language to Focus Area
+# =============================================================================
+
+# Shortcuts map common terms to canonical focus areas
+FOCUS_SHORTCUTS = {
+    # UI/UX
+    "ui": "ui", "ux": "ui", "design": "ui", "styling": "ui",
+    "look": "ui", "appearance": "ui", "layout": "ui", "responsive": "ui",
+    "prettier": "ui", "ugly": "ui", "clean up": "ui", "css": "ui",
+    "tailwind": "ui", "colors": "ui", "fonts": "ui", "mobile": "ui",
+    "touch": "ui", "buttons": "ui", "forms": "ui",
+    
+    # API
+    "api": "api", "endpoints": "api", "routes": "api", "rest": "api",
+    "graphql": "api", "requests": "api", "responses": "api",
+    
+    # Data
+    "data": "data", "database": "data", "db": "data", "schema": "data",
+    "queries": "data", "sql": "data", "models": "data", "migrations": "data",
+    "sqlite": "data", "postgres": "data", "mysql": "data",
+    
+    # Performance
+    "performance": "performance", "speed": "performance", "slow": "performance",
+    "fast": "performance", "optimize": "performance", "caching": "performance",
+    "memory": "performance", "cpu": "performance", "latency": "performance",
+    
+    # Testing
+    "testing": "testing", "tests": "testing", "coverage": "testing",
+    "tdd": "testing", "unit tests": "testing", "pytest": "testing",
+    "integration tests": "testing", "e2e": "testing",
+    
+    # Security
+    "security": "security", "auth": "security", "secure": "security",
+    "vulnerabilities": "security", "secrets": "security", "passwords": "security",
+    "injection": "security", "xss": "security", "csrf": "security",
+    
+    # Documentation
+    "docs": "docs", "documentation": "docs", "readme": "docs", 
+    "comments": "docs", "docstrings": "docs", "api docs": "docs",
+    
+    # Architecture/Code Quality
+    "architecture": "architecture", "structure": "architecture",
+    "refactor": "architecture", "clean code": "architecture",
+    "separation": "architecture", "modules": "architecture",
+    "organization": "architecture",
+    
+    # Error Handling
+    "errors": "errors", "error handling": "errors", "exceptions": "errors",
+    "logging": "errors", "debugging": "errors", "crashes": "errors",
+    
+    # DX (Developer Experience)
+    "dx": "dx", "setup": "dx", "tooling": "dx", "config": "dx",
+    "developer": "dx", "onboarding": "dx",
+}
+
+# Detailed descriptions for each canonical focus area
+FOCUS_DESCRIPTIONS = {
+    "ui": "User interface, styling, responsiveness, UX patterns, visual design, mobile layout, touch targets, accessibility",
+    "api": "API design, endpoints, request/response handling, REST conventions, error responses, versioning",
+    "data": "Database schema, queries, data flow, migrations, ORM usage, data integrity, relationships",
+    "performance": "Speed optimization, caching, memory usage, query optimization, lazy loading, bundle size",
+    "testing": "Test coverage, test quality, edge cases, unit tests, integration tests, test organization",
+    "security": "Authentication, authorization, input validation, secrets handling, injection prevention, CSRF/XSS",
+    "docs": "README quality, inline comments, API documentation, setup guides, architecture docs",
+    "architecture": "Code structure, separation of concerns, modularity, dependency management, design patterns",
+    "errors": "Error handling, exception management, logging, user-facing error messages, recovery strategies",
+    "dx": "Developer experience, setup process, tooling, configuration, local development workflow",
+    "all": "Comprehensive analysis across all areas",
+}
+
+# Paths to check for goals document
+GOAL_DOC_PATHS = [
+    "GOALS.md",
+    ".maw/goals.md",
+    "docs/GOALS.md",
+    ".github/GOALS.md",
+]
+
+
+def resolve_focus(raw_input: str) -> tuple[str, str]:
+    """
+    Resolve natural language input to a focus area.
+    
+    Returns:
+        tuple: (canonical_focus_or_raw, description)
+        - If matched: (canonical_name, FOCUS_DESCRIPTIONS[canonical])
+        - If not matched: (raw_input, raw_input) - LLM interprets directly
+    """
+    if not raw_input:
+        return ("all", FOCUS_DESCRIPTIONS["all"])
+    
+    normalized = raw_input.lower().strip()
+    
+    # Check exact shortcuts first
+    if normalized in FOCUS_SHORTCUTS:
+        canonical = FOCUS_SHORTCUTS[normalized]
+        return (canonical, FOCUS_DESCRIPTIONS[canonical])
+    
+    # Check if any shortcut is contained in the input
+    for shortcut, canonical in FOCUS_SHORTCUTS.items():
+        if shortcut in normalized:
+            return (canonical, FOCUS_DESCRIPTIONS[canonical])
+    
+    # No match - pass through raw input for LLM interpretation
+    return (raw_input, raw_input)
+
+
+def load_repo_goals(project_path: str) -> Optional[str]:
+    """
+    Load goals document from repo if it exists.
+    
+    Returns:
+        Optional[str]: Content of goals file, or None if not found
+    """
+    path = Path(project_path).resolve()
+    
+    for goal_path in GOAL_DOC_PATHS:
+        full_path = path / goal_path
+        if full_path.exists():
+            return full_path.read_text()
+    
+    return None
 CONTENT_DIR = Path(__file__).parent.parent / "content"
 
 
@@ -54,14 +178,14 @@ async def list_tools():
         ),
         Tool(
             name="maw_review",
-            description="Analyze codebase, identify improvements, generate agent prompts. PAUSES for your review before agents can be launched.",
+            description="Analyze codebase, identify improvements, generate agent prompts. PAUSES for your review before agents can be launched. Checks for GOALS.md to prioritize findings.",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "project_path": {"type": "string", "default": "."},
                     "focus": {
                         "type": "string",
-                        "description": "Optional focus area: security, performance, testing, docs, all"
+                        "description": "Focus area - use shortcuts (ui, api, data, security, testing, docs, performance, architecture, errors, dx) or natural language (e.g., 'make forms less janky', 'error handling is weak')"
                     },
                     "wave_name": {
                         "type": "string",
@@ -230,7 +354,7 @@ async def handle_status(args: dict) -> str:
 async def handle_review(args: dict) -> str:
     """Review: Analyze and generate agent prompts"""
     project_path = args.get("project_path", ".")
-    focus = args.get("focus", "all")
+    raw_focus = args.get("focus", "all")
     wave_name = args.get("wave_name", "")
     
     state = load_state(project_path)
@@ -240,16 +364,60 @@ async def handle_review(args: dict) -> str:
     prompts_dir = path / "AGENT_PROMPTS"
     prompts_dir.mkdir(exist_ok=True)
     
-    # This is where the actual analysis would happen
-    # For now, return instructions for the LLM to do the analysis
+    # Resolve focus - handles natural language
+    focus_name, focus_description = resolve_focus(raw_focus)
+    
+    # Load repo goals if they exist
+    repo_goals = load_repo_goals(project_path)
+    
+    # Build the goals context section
+    goals_section = ""
+    if repo_goals:
+        goals_section = f"""
+### Repository Goals (from GOALS.md)
+
+The repository has a goals document. Use it to prioritize findings:
+
+```
+{repo_goals}
+```
+
+**Priority Rules:**
+1. Items under "Active Focus" or "Current" are highest priority
+2. Items under "Backlog" or "Next" are secondary
+3. Items under "Not Now" or "Deferred" should be skipped unless critical
+4. The --focus flag (if provided) overrides these defaults
+"""
+    
+    # Build focus context section
+    if focus_name == "all":
+        focus_section = "**Focus:** All areas (comprehensive analysis)"
+    elif focus_name == raw_focus:
+        # Custom/natural language focus - pass through to LLM
+        focus_section = f"""**Focus:** Custom focus requested
+
+User said: "{raw_focus}"
+
+Interpret this and prioritize findings related to this goal.
+Deprioritize or omit unrelated findings unless they are critical issues."""
+    else:
+        # Matched a canonical focus area
+        focus_section = f"""**Focus:** {focus_name.upper()}
+
+{focus_description}
+
+Prioritize findings in this area. Include critical issues from other areas, 
+but deprioritize or omit non-critical findings unrelated to {focus_name}."""
     
     analysis_prompt = f"""
 ## Review: Codebase Analysis
 
 Analyze this codebase and identify 3-5 high-impact improvements.
 
-**Focus:** {focus}
+{focus_section}
+
 **Wave:** {wave_name or "Wave 1"}
+{goals_section}
 
 ### Analysis Areas
 1. **Performance** - Slow queries, memory issues, N+1 problems

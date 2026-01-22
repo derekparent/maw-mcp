@@ -13,7 +13,7 @@ Coordinate parallel AI agent development workflows from any Claude interface.
 
 ```bash
 # Clone
-git clone https://github.com/Dparent97/maw-mcp
+git clone git@github.com:derekparent/maw-mcp.git
 cd maw-mcp
 
 # Create virtual environment
@@ -89,6 +89,52 @@ idle → review → launch → integrate → decide
 
 Review AGENT_PROMPTS/ before running maw_launch
 ```
+
+#### Focus Options
+
+Use shortcuts or natural language:
+
+| Shortcut | Also matches |
+|----------|--------------|
+| `ui` | ux, design, styling, layout, responsive, forms, buttons, mobile |
+| `api` | endpoints, routes, rest, graphql |
+| `data` | database, db, schema, queries, sql, models, migrations |
+| `performance` | speed, slow, fast, optimize, caching, memory |
+| `testing` | tests, coverage, tdd, pytest, e2e |
+| `security` | auth, secrets, passwords, injection, xss |
+| `docs` | documentation, readme, comments, docstrings |
+| `architecture` | structure, refactor, modules, organization |
+| `errors` | error handling, exceptions, logging, debugging |
+| `dx` | setup, tooling, config, developer experience |
+
+Or just say what you want:
+```
+> maw_review focus="make the forms less janky"
+> maw_review focus="error handling is weak"
+> maw_review focus="needs better offline support"
+```
+
+#### GOALS.md
+
+Create `GOALS.md` in your repo to steer MAW automatically:
+
+```markdown
+# Project Goals
+
+## Active Focus
+- Mobile-first redesign of inventory screens
+- Touch targets too small
+
+## Backlog
+- Add offline sync
+- Better error messages
+
+## Not Now
+- Performance optimization
+- Dark mode
+```
+
+MAW reads this and prioritizes findings accordingly. The `--focus` flag overrides GOALS.md when provided.
 
 ### Launch
 
@@ -192,6 +238,7 @@ content/
 ├── templates/
 │   ├── AGENT_PROMPT.md
 │   ├── COORDINATION.md
+│   ├── GOALS.md          # Copy to your repo
 │   └── PR_TEMPLATE.md
 └── UNIVERSAL_PATTERNS.md
 ```
