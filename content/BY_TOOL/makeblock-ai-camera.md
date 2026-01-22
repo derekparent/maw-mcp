@@ -154,3 +154,75 @@ Makeblock's mBlock lesson files (.mblock → .md exports) contain the VERIFIED w
 
 **Why it matters:**
 Hours of debugging avoided by using lesson code as ground truth instead of documentation.
+
+---
+
+## AprilTag API Returns Strings, Not Integers
+
+**Date:** 2026-01-22
+**Project:** sparklebot-mcp
+
+**Context:**
+AprilTag detection was failing with "can't convert 'int' object to str implicitly" error in MicroPython. The error occurred when comparing values like `v2 > 0`.
+
+**Problem:**
+The AI Camera API `ai_camera_tag_analysis_result_get()` returns **strings**, not integers:
+
+```python
+v2 = cam.ai_camera_tag_analysis_result_get(2, 1)  # Returns "13" not 13
+v3 = cam.ai_camera_tag_analysis_result_get(3, 1)  # Returns "-4" not -4
+
+# This FAILS in MicroPython:
+if v2 > 0:  # Can't compare string "13" to int 0
+    ...
+```
+
+**Solution:**
+Convert to int before comparison:
+
+```python
+v2_raw = cam.ai_camera_tag_analysis_result_get(2, 1)
+v3_raw = cam.ai_camera_tag_analysis_result_get(3, 1)
+
+# Convert to int (handle empty/None)
+v2 = int(v2_raw) if v2_raw else 0
+v3 = int(v3_raw) if v3_raw else 0
+
+# Now comparison works
+if v2 > 0 or v3 != 0:
+    publish_status("TAG:d=%s,a=%s" % (v2, v3))
+```
+
+**Debugging approach:**
+1. Added `cyberpi.console.println()` debug statements
+2. Checked type with `type(v2)` - revealed `<class 'str'>`
+3. Found failure point was the comparison, not string building
+
+**Why it matters:**
+- Other camera APIs likely also return strings
+- Always verify types from hardware APIs - don't assume
+- MicroPython string/int comparison fails silently with confusing error messages
+
+---
+
+## MicroPython String Formatting
+
+**Date:** 2026-01-22
+**Project:** sparklebot-mcp
+
+**Context:**
+String concatenation with `+` operator was causing issues in MicroPython on CyberPi.
+
+**Learning:**
+Use `%` format strings instead of `+` concatenation for safer type handling:
+
+```python
+# AVOID - can fail with wrong types:
+msg = "TAG:d=" + str(val_2) + ",a=" + str(val_3)
+
+# PREFER - handles types automatically:
+msg = "TAG:d=%s,a=%s" % (val_2, val_3)
+```
+
+**Why it matters:**
+`%` formatting is more forgiving of types and is the idiomatic pattern in MicroPython/embedded contexts.
