@@ -296,3 +296,185 @@ cyberpi.audio.set_vol(100)
 # Play tone (frequency Hz, duration seconds)
 cyberpi.audio.play_tone(880, 0.1)  # A5 note, 100ms
 ```
+
+---
+
+## Network Debugging Pattern: IP Consistency
+
+**Date:** 2026-01-21
+**Project:** SparkleBot MCP
+
+**Context:**
+When robot shows `EHOSTUNREACH` or can't connect to MQTT broker, the issue is often IP mismatch across configs.
+
+**Problem:**
+Robot connected to WiFi but couldn't reach Mac's MQTT broker. IPs were inconsistent:
+- Mac actual: `192.168.0.167`
+- config.yaml: `192.168.0.50`
+- robot/main.py: `192.168.1.100`
+
+**Solution:**
+Check ALL IP references before testing:
+```bash
+# 1. Find Mac's actual IP
+ipconfig getifaddr en0   # or: ip route get 1 | awk '{print $7}'
+
+# 2. Check all config files
+grep -r "192.168" config.yaml robot/main.py
+
+# 3. Ensure they match
+```
+
+**Prevention:**
+- Keep IPs in a single source (config.yaml)
+- Document which IP goes where
+- After network changes, verify IP and update configs
+
+---
+
+## Guest Networks and Local Access
+
+**Date:** 2026-01-21
+**Project:** SparkleBot MCP
+
+**Context:**
+Mac and robot both on guest network, robot couldn't reach Mac.
+
+**Gotcha:**
+Guest networks with "Allow Local Access" enabled CAN reach devices on the main network, but not necessarily each other depending on AP isolation settings.
+
+**Solution:**
+For MQTT/robotics projects, prefer having both devices on the main network to avoid AP isolation issues entirely.
+
+---
+
+## MCP + MQTT Architecture: Natural Language Hardware Control
+
+**Date:** 2026-01-21
+**Project:** SparkleBot MCP
+
+**Context:**
+Successfully demonstrated natural language control of physical robot via MCP.
+
+**Pattern:**
+```
+User (natural language) → Claude (interprets intent)
+    → MCP tools (translate to protocol)
+    → MQTT (transport)
+    → Robot (dumb executor)
+```
+
+**Key Insight:**
+Claude doesn't need pre-scripted commands. When given "make it do a little dance", Claude choreographs by calling available MCP tools in sequence (turns, LEDs, sounds) to achieve the intent.
+
+**Enabling Factors:**
+1. MCP tools have clear docstrings explaining what they do
+2. Robot executor responds to discrete commands
+3. Claude has context about available capabilities
+
+---
+
+## Ultrasonic Sensor: Default Value is Max Range
+
+**Date:** 2026-01-21
+**Project:** SparkleBot MCP
+
+**Context:**
+Testing ultrasonic distance sensor, initially got 300cm readings.
+
+**Gotcha:**
+When nothing is in range, `mbuild.ultrasonic2.get()` returns 300 (max range), not 0 or error.
+
+**Pattern:**
+```python
+dist = mbuild.ultrasonic2.get()
+if dist >= 300:
+    # Nothing detected in range
+elif dist < 20:
+    # Object very close
+```
+
+**Note:** Verified sensor works by placing hand in front - got accurate 5-7cm readings.
+
+---
+
+## CLI Upload: Bypass mBlock GUI with mpremote
+
+**Date:** 2026-01-22
+**Project:** SparkleBot MCP
+
+**Context:**
+mBlock GUI upload is slow iteration bottleneck. Each debug cycle: edit in Cursor → manual upload in mBlock → test → report back.
+
+**Key Finding:**
+mBlock "Upload Mode" is just standard MicroPython Raw REPL protocol (`Ctrl+C → Ctrl+A → write file → Ctrl+D`). The protocol is NOT proprietary.
+
+**Solution:**
+Use `mpremote` (official MicroPython CLI tool):
+
+```bash
+# Install
+pip install mpremote
+
+# Close mBlock completely first (mLink holds serial port!)
+
+# Find device
+mpremote connect list
+
+# Upload
+mpremote cp robot/main.py :/main.py
+
+# Run immediately (optional)
+mpremote run robot/main.py
+```
+
+**Wrapper script for Cursor:**
+```bash
+#!/bin/bash
+# deploy.sh
+mpremote cp robot/main.py :/main.py && echo "✓ Uploaded"
+```
+
+**Critical Prerequisite:**
+Close mBlock and mLink completely. Check Activity Monitor if "device busy" error.
+
+**Alternative Tools:**
+- `ampy` (Adafruit) - older, works
+- `rshell` - more powerful, can be finicky
+- Thonny IDE - GUI but file browser useful
+
+**Source:**
+CyberPi uses ESP32-WROVER-B with USB-to-UART bridge (CH340/CP210x). No native USB mass storage (hardware limitation), but serial REPL works.
+
+---
+
+## MicroPython API Returns Strings, Not Ints
+
+**Date:** 2026-01-22
+**Project:** SparkleBot MCP
+
+**Context:**
+AprilTag navigation demo failing silently. Comparisons like `v2 > 0` always evaluated False.
+
+**Problem:**
+`ai_camera_tag_analysis_result_get()` returns strings, not integers:
+
+```python
+# FAILS:
+v2 = cam.ai_camera_tag_analysis_result_get(2, 1)
+if v2 > 0:  # Always False because "5" > 0 is type error in MicroPython
+```
+
+**Solution:**
+Cast ALL camera API returns immediately:
+
+```python
+# CORRECT:
+v2 = int(cam.ai_camera_tag_analysis_result_get(2, 1))
+if v2 > 0:  # Now works
+```
+
+**Prevention:**
+- Add `int()` cast at API boundary for ALL numeric camera values
+- Use debug prints to verify types: `console.println("v2 type: %s" % type(v2))`
+- MicroPython type coercion differs from Python 3
