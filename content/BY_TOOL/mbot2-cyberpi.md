@@ -398,53 +398,56 @@ elif dist < 20:
 
 ---
 
-## CLI Upload: Bypass mBlock GUI with mpremote
+## CLI Upload: CyberPi Uses Proprietary Protocol (NOT Standard REPL)
 
-**Date:** 2026-01-22
+**Date:** 2026-01-23 (Updated - previous entry was WRONG)
 **Project:** SparkleBot MCP
 
 **Context:**
-mBlock GUI upload is slow iteration bottleneck. Each debug cycle: edit in Cursor → manual upload in mBlock → test → report back.
+Earlier research (Gemini, Perplexity) claimed mBlock "Upload Mode" uses standard MicroPython Raw REPL. This is **INCORRECT**.
 
-**Key Finding:**
-mBlock "Upload Mode" is just standard MicroPython Raw REPL protocol (`Ctrl+C → Ctrl+A → write file → Ctrl+D`). The protocol is NOT proprietary.
+**The Truth:**
+CyberPi uses a **proprietary Makeblock binary protocol**. Standard tools (mpremote, ampy, rshell) **DO NOT WORK**.
 
-**Solution:**
-Use `mpremote` (official MicroPython CLI tool):
+**Why Standard Tools Fail:**
+On connect, CyberPi disables REPL: `config.write_config("repl_enable", False)`
 
-```bash
-# Install
-pip install mpremote
+**Protocol Structure (Reverse Engineered):**
+```
+Frame: 0xF3 [cmd] [length:2 LE] [payload] [checksum] 0xF4
 
-# Close mBlock completely first (mLink holds serial port!)
+Command byte formula: cmd = payload_length - 13 (except ping/ACK)
 
-# Find device
-mpremote connect list
-
-# Upload
-mpremote cp robot/main.py :/main.py
-
-# Run immediately (optional)
-mpremote run robot/main.py
+Packet types:
+- Ping:     f3 f6 03 00 [payload] [checksum] f4
+- Exec:     f3 [cmd] [len] 28 04 00 00 [inner_len] [python] [chk] f4
+- Header:   f3 [cmd] [len] 01 00 5e 01 [inner_len] 00 [size:4] [hash:4] /flash/_xx_main.py [chk] f4
+- Data:     f3 [cmd] [len] 01 00 5e 02 [inner_len] [addr:4] [code] [chk] f4
 ```
 
-**Wrapper script for Cursor:**
-```bash
-#!/bin/bash
-# deploy.sh
-mpremote cp robot/main.py :/main.py && echo "✓ Uploaded"
+**Upload Sequence:**
+1. Ping (×2)
+2. Exec: `import config`
+3. Exec: `config.write_config("repl_enable", False)`
+4. File header (declares filename + size + hash)
+5. Data packet (code content)
+6. Device reboots → "PYB: fast reboot"
+7. Code executes
+
+**Blocking Issue:**
+File header contains 4-byte hash. Device validates it. Standard CRC32 doesn't match. Algorithm unknown.
+
+**Current CLI Tool:**
 ```
+/Users/dp/Projects/sparklebot-mcp/scripts/cyberpi_upload.py
+```
+Works for files with known hashes. Blocked on arbitrary files until hash algorithm cracked.
+
+**mBlock Built-in Hex Debugger:**
+At bottom of mBlock window, enable "Hex Send" and "Hex Receive" checkboxes to capture protocol traffic.
 
 **Critical Prerequisite:**
-Close mBlock and mLink completely. Check Activity Monitor if "device busy" error.
-
-**Alternative Tools:**
-- `ampy` (Adafruit) - older, works
-- `rshell` - more powerful, can be finicky
-- Thonny IDE - GUI but file browser useful
-
-**Source:**
-CyberPi uses ESP32-WROVER-B with USB-to-UART bridge (CH340/CP210x). No native USB mass storage (hardware limitation), but serial REPL works.
+Close mBlock AND mLink completely before any CLI upload attempt (mLink holds serial port).
 
 ---
 
