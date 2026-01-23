@@ -76,27 +76,41 @@ This enables "follow the ball" without ultrasonic sensor.
 
 ---
 
-## AprilTags for Navigation
+## AprilTags for Navigation - CORRECTED API
 
-**Date:** 2026-01-21
+**Date:** 2026-01-23 (Updated from 2026-01-21)
 **Project:** sparklebot-mcp
 
 **Context:**
 Ultrasonic sensor doesn't physically fit when camera is attached. Needed alternative navigation.
 
 **Learning:**
-AprilTags provide DISTANCE and ROTATION ANGLE - better than ultrasonic for targeted navigation:
+AprilTags provide DISTANCE and ROTATION ANGLE, but you must use the **correct API functions**:
 
 ```python
 mbuild.ai_camera.ai_camera_set_func_switch(4, 1)  # Tag mode
 mbuild.ai_camera.ai_camera_tag_func_mode_set(3, 1)  # AprilTag sub-mode
 
-# Get tag analysis results
-result = mbuild.ai_camera.ai_camera_tag_analysis_result_get(attr, 1)
+# CORRECT: Use dedicated distance/angle functions
+distance_cm = mbuild.ai_camera.ai_camera_tag_distance_get(1)       # Returns actual cm
+angle_deg = mbuild.ai_camera.ai_camera_tag_angle_offset_get(1)     # Returns degrees
+
+# WRONG: analysis_result_get only returns TAG ID, not distance/angle!
+# tag_id = mbuild.ai_camera.ai_camera_tag_analysis_result_get(attr, 1)  # Always returns tag ID
 ```
 
+**How this was discovered:**
+Camera display showed "23cm -20°" but API returned "2" for all attributes. Used `dir(mbuild.ai_camera)` to list all methods and found `ai_camera_tag_distance_get` and `ai_camera_tag_angle_offset_get` functions.
+
+**Available AprilTag functions:**
+- `ai_camera_tag_distance_get(index)` - Distance in cm
+- `ai_camera_tag_angle_offset_get(index)` - Angle in degrees
+- `ai_camera_tag_spatial_attribute_get(tag_id, attr, index)` - X/Y/W/H (attr 1-4)
+- `ai_camera_tag_analysis_result_get(attr, index)` - Returns tag ID only (misleading name!)
+- `ai_camera_tag_func_mode_set(mode, param)` - Set sub-mode (3=AprilTag)
+
 **Why it matters:**
-AprilTags can replace ultrasonic for waypoint navigation with more precision (actual distance + angle vs just distance).
+Documentation and forum examples show `analysis_result_get` but it only returns tag ID. The actual distance/angle require separate functions. Always use `dir()` to discover undocumented APIs.
 
 ---
 

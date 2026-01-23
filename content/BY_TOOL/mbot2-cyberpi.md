@@ -244,34 +244,48 @@ if cyberpi.is_tiltforward():
 
 ---
 
-## Motor Control
+## Motor Control - POLARITY WARNING
 
-**Date:** 2026-01-18
+**Date:** 2026-01-23 (Updated from 2026-01-18)
 **Project:** SparkleBot
 
 **Context:**
-mBot2 has two drive motors.
+mBot2 has two drive motors, but motor wiring may require polarity inversion.
 
-**Pattern:**
+**Gotcha:**
+`drive_power(left, right)` with equal positive values may cause **spinning instead of forward motion** depending on motor wiring. Test and invert if needed:
+
 ```python
-# Drive with power levels (-100 to 100)
+# Standard API (may spin if wiring is inverted):
 mbot2.drive_power(left_power, right_power)
 
-# Forward
-mbot2.drive_power(40, 40)
+# If robot spins when both values are equal, invert right motor:
+mbot2.drive_power(left_power, -right_power)  # Invert right
+```
+
+**Verified pattern for forward motion:**
+```python
+# Test: MOVE:30:30 should go straight forward
+# If it spins, use: drive_power(left, -right)
+
+# Forward (with inverted right motor)
+mbot2.drive_power(40, -40)
 
 # Backward
-mbot2.drive_power(-30, -30)
+mbot2.drive_power(-30, 30)
 
 # Spin right
-mbot2.drive_power(50, -50)
+mbot2.drive_power(50, 50)  # Both positive = spin
 
 # Spin left
-mbot2.drive_power(-50, 50)
+mbot2.drive_power(-50, -50)
 
 # Stop
 mbot2.drive_power(0, 0)
 ```
+
+**Discovery method:**
+If FORWARD:30:1 works but MOVE:30:30 spins, the motor polarity is different between `forward()` and `drive_power()`. The `forward()` function handles this internally.
 
 ---
 
