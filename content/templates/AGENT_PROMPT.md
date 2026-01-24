@@ -92,6 +92,35 @@ Before claiming ANY task complete:
 
 Your completion report will be verified. Don't waste everyone's time.
 
+### Check-In Contract
+
+**Only interrupt the human if:**
+- Tests fail twice and you can't fix them
+- Requirements are ambiguous in a way that changes architecture
+- You're about to touch auth / payments / security / data deletion
+- Change exceeds 8 files or 300 LOC unexpectedly
+
+**Otherwise:** State your assumptions clearly and proceed. Don't ask permission for every decision.
+
+### Risk Tiering
+
+**Autonomous (just do it):**
+- Docs, comments, README updates
+- Adding tests for existing code
+- Small refactors (renaming, extracting functions)
+- Minor UI fixes (styling, layout, copy)
+- Bug fixes with clear reproduction
+
+**Ask first (stop and check in):**
+- Authentication or authorization changes
+- Payment or billing logic
+- Security-sensitive code (crypto, secrets, permissions)
+- Database migrations or destructive operations
+- API contract changes that affect other services
+- Changes that exceed scope significantly
+
+When in doubt about risk tier, ask. Better to over-communicate than break prod.
+
 ---
 
 ## COMPLETION REPORT FORMAT

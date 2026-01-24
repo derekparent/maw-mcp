@@ -267,6 +267,27 @@ maw_review focus="error messages are unhelpful"
 3. **One iteration at a time** - Complete the cycle before starting another
 4. **Capture learnings** - Use `maw_learn` when you hit something tricky
 
+## Agent Discipline Rules
+
+Generated agent prompts include these rules. Know what they enforce:
+
+### Check-In Contract
+Agents only interrupt you if:
+- Tests fail twice and can't be fixed
+- Requirements ambiguity that changes architecture
+- Touching auth / payments / security / data deletion
+- Change exceeds 8 files or 300 LOC unexpectedly
+
+Otherwise they state assumptions and proceed.
+
+### Risk Tiering
+**Autonomous:** docs, tests, small refactors, minor UI, clear bug fixes
+**Must ask:** auth, payments, security, DB migrations, API contracts
+
+### Verification
+Agents must run tests and include evidence before claiming done.
+"Tests pass" without output = rejected.
+
 ## When to Use Sequential Mode
 
 Can't run multiple agents? Use `maw_launch next=true`:
