@@ -351,7 +351,7 @@ Capture insights as you work. Use `maw_learn` to add entries, or edit directly.
 ---
 
 '''
-CONTENT_DIR = Path(__file__).parent.parent / "content"
+CONTENT_DIR = Path.home() / "Projects" / "skills" / "learnings"
 
 
 def slugify(text: str) -> str:
