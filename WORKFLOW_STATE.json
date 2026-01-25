@@ -1,0 +1,71 @@
+{
+  "project": "maw-mcp",
+  "project_path": "/Users/dp/Projects/maw-mcp",
+  "phase": "launch",
+  "iteration": 1,
+  "status": "launching",
+  "tech_stack": "Python MCP Server",
+  "review_complete": true,
+  "wave": {
+    "number": 1,
+    "name": "Code Quality & Reliability",
+    "agents": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "started_at": "2026-01-03T00:00:00Z",
+    "completed_at": null,
+    "status": "in_progress"
+  },
+  "agents": [
+    {
+      "id": 1,
+      "role": "Testing Infrastructure",
+      "slug": "testing-infrastructure",
+      "branch": "agent/1-testing-infrastructure",
+      "status": "not_started",
+      "started_at": null,
+      "completed_at": null,
+      "pr_number": null,
+      "wave": 1
+    },
+    {
+      "id": 2,
+      "role": "Error Handling",
+      "slug": "error-handling",
+      "branch": "agent/2-error-handling",
+      "status": "not_started",
+      "started_at": null,
+      "completed_at": null,
+      "pr_number": null,
+      "wave": 1
+    },
+    {
+      "id": 3,
+      "role": "Code Modularity",
+      "slug": "code-modularity",
+      "branch": "agent/3-code-modularity",
+      "status": "not_started",
+      "started_at": null,
+      "completed_at": null,
+      "pr_number": null,
+      "wave": 1
+    },
+    {
+      "id": 4,
+      "role": "Type Safety & Docs",
+      "slug": "type-safety-docs",
+      "branch": "agent/4-type-safety-docs",
+      "status": "not_started",
+      "started_at": null,
+      "completed_at": null,
+      "pr_number": null,
+      "wave": 1
+    }
+  ],
+  "history": [],
+  "created_at": "2026-01-03T00:00:00Z",
+  "last_updated": "2026-01-04T03:15:54.134531+00:00"
+}
